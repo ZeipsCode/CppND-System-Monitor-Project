@@ -73,7 +73,6 @@ float LinuxParser::MemoryUtilization() {
   float freePercent;
   float memTotal;
   float memFree;
-  float memAvailable;
   float memValue;
   std::ifstream stream(kProcDirectory + kMeminfoFilename);
   
@@ -90,14 +89,10 @@ float LinuxParser::MemoryUtilization() {
       memFree = memValue;
       continue;
     }
-    else if (key == "MemAvailable:"){
-      memAvailable = memValue;
-      continue;
-    }
   } 
   freePercent = (float)((memTotal - memFree) / memTotal);
-  return freePercent;
 	}
+  return freePercent;
 }
 
 long LinuxParser::UpTime() { 
@@ -115,29 +110,30 @@ long LinuxParser::UpTime() {
 
 long LinuxParser::Jiffies() { 
   std::ifstream filestream(kProcDirectory + kStatFilename);
+  long user;
+  long nice;
+  long system;
+  long idle;
+  long iowait;
+  long irq;
+  long softirq;
+  long steal;
+  long guess;
+  long guessnice; 
+  long totalUserTime = user - guess;
+  long totalNiceTime = nice - guessnice;
+  long totalIdleTime = idle + iowait;
+  long totalSystem = system + irq + softirq;
+  long totalVirtualTime = guess + guessnice;
   if (filestream.is_open()) {
       std::string line;
       std::getline(filestream, line);
       std::istringstream linestream(line);
       std::string cpu;
-      long user;
-      long nice;
-      long system;
-      long idle;
-      long iowait;
-      long irq;
-      long softirq;
-      long steal;
-      long guess;
-      long guessnice; 
+      
       linestream >> cpu >> user >> nice >> system >> idle >> iowait >> irq >> softirq >> steal >> guess >> guessnice;
-      long totalUserTime = user - guess;
-      long totalNiceTime = nice - guessnice;
-      long totalIdleTime = idle + iowait;
-      long totalSystem = system + irq + softirq;
-      long totalVirtualTime = guess + guessnice;
-      return totalUserTime + totalNiceTime + totalIdleTime + totalSystem + totalVirtualTime;
   } 
+  return totalUserTime + totalNiceTime + totalIdleTime + totalSystem + totalVirtualTime;
 }
 
 long LinuxParser::ActiveJiffies(int pid) {
@@ -195,11 +191,7 @@ long LinuxParser::IdleJiffies() {
       long guess;
       long guessnice; 
       linestream >> cpu >> user >> nice >> system >> idle >> iowait >> irq >> softirq >> steal >> guess >> guessnice;
-      long totalUserTime = user - guess;
-      long totalNiceTime = nice - guessnice;
       long totalIdleTime = idle + iowait;
-      long totalSystem = system + irq + softirq;
-      long totalVirtualTime = guess + guessnice;
       return totalIdleTime;
   }
   return 0;
@@ -267,8 +259,8 @@ vector<LinuxParser::CpuKPI> LinuxParser::CpuUtilPercentage() {
           current.totalTime = totalIdleTime + totalNoIdleTime;
           returnVector.emplace_back(current);
       }     
-      return returnVector;
   }
+  return returnVector;
 }
 
 vector<string> LinuxParser::CpuUtilization() { 
@@ -276,7 +268,7 @@ vector<string> LinuxParser::CpuUtilization() {
   sleep(1);
   std::vector<LinuxParser::CpuKPI> currentVector = LinuxParser::CpuUtilPercentage(); 
   vector<std::string> returnCpu;
-  for(int i = 0; i < currentVector.size(); i++) {
+  for(size_t i = 0; i < currentVector.size(); i++) {
       std::ostringstream oCpuStream;
       long totalDelta = currentVector[i].totalTime - previousVector[i].totalTime ;
       long idleDelta = currentVector[i].idleTime - previousVector[i].idleTime ;
@@ -384,7 +376,6 @@ string LinuxParser::User(int pid) {
   std::string uid = Uid(pid);
   std::string userName;
   std::ifstream stream(kPasswordPath);
-   long runningProcesses = 0;
   if (stream.is_open()) {
       std::string line;      
       while (std::getline(stream, line)) {
@@ -412,7 +403,6 @@ long LinuxParser::UpTime(int pid) {
       std::string ignore;
       for(int i = 0; i < 21; i++) linestream >> ignore;
       linestream >> starttime; 
-      std::time_t now = std::time(0);
       std::time_t elapsedTime = LinuxParser::UpTime() - (starttime/sysconf(_SC_CLK_TCK));
       return elapsedTime;
   }
